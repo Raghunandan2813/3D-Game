@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARCHER X — Hand-Controlled 3D Shooting</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --neon: #00ffe7;
+            --neon2: #ff2d78;
+            --gold: #ffd700;
+            --bg: #060a12;
+            --panel: rgba(6, 10, 18, 0.88);
+            --glass: rgba(0, 255, 231, 0.07);
+            --danger: #ff2d78;
+            --font: 'Orbitron', sans-serif;
+            --mono: 'Share Tech Mono', monospace;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: var(--font);
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+        }
+
+        #three-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* WEBCAM */
+        #webcam-wrap {
+            position: fixed;
+            bottom: 18px;
+            left: 18px;
+            z-index: 50;
+            border: 1.5px solid var(--neon);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 18px rgba(0, 255, 231, 0.35);
+            transition: opacity .3s;
+        }
+
+        #webcam {
+            width: 180px;
+            height: 135px;
+            transform: scaleX(-1);
+            display: block;
+        }
+
+        #webcam-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        #webcam-label {
+            position: absolute;
+            top: 4px;
+            left: 6px;
+            color: var(--neon);
+            font-size: 9px;
+            font-family: var(--mono);
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px var(--neon);
+        }
+
+        #webcam-status {
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            font-size: 9px;
+            font-family: var(--mono);
+            letter-spacing: 1px;
+        }
+
+        /* CROSSHAIR */
+        #crosshair {
+            position: fixed;
+            pointer-events: none;
+            z-index: 60;
+            transform: translate(-50%, -50%);
+            transition: left .04s, top .04s;
+        }
+
+        #crosshair svg {
+            filter: drop-shadow(0 0 6px var(--neon));
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 14px 22px;
+            pointer-events: none;
+        }
+
+        .hud-block {
+            background: var(--panel);
+            border: 1px solid rgba(0, 255, 231, 0.2);
+            border-radius: 8px;
+            padding: 8px 16px;
+            backdrop-filter: blur(8px);
+            pointer-events: all;
+        }
+
+        #score-display {
+            text-align: right;
+        }
+
+        #score-val {
+            font-size: 38px;
+            font-weight: 900;
+            color: var(--gold);
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            line-height: 1;
+        }
+
+        #score-label {
+            font-size: 9px;
+            color: var(--neon);
+            letter-spacing: 3px;
+        }
+
+        #combo-display {
+            font-size: 13px;
+            color: var(--neon2);
+            letter-spacing: 1px;
+            min-height: 18px;
+        }
+
+        #timer-display {
+            text-align: center;
+        }
+
+        #timer-val {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+        }
+
+        #timer-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 3px;
+        }
+
+        #mode-display {
+            text-align: left;
+        }
+
+        #mode-val {
+            font-size: 13px;
+            color: var(--neon);
+            letter-spacing: 2px;
+        }
+
+        #streak-val {
+            font-size: 10px;
+            color: var(--neon2);
+            letter-spacing: 1px;
+            min-height: 15px;
+        }
+
+        /* GESTURE INDICATOR */
+        #gesture-bar {
+            position: fixed;
+            bottom: 170px;
+            left: 18px;
+            z-index: 50;
+            width: 180px;
+            background: var(--panel);
+            border: 1px solid rgba(0, 255, 231, 0.2);
+            border-radius: 8px;
+            padding: 8px 10px;
+            pointer-events: none;
+        }
+
+        #gesture-name {
+            font-size: 9px;
+            color: var(--neon);
+            letter-spacing: 2px;
+            font-family: var(--mono);
+        }
+
+        #pinch-bar-wrap {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 5px;
+        }
+
+        #pinch-bar {
+            height: 5px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--neon), var(--neon2));
+            width: 0%;
+            transition: width .08s;
+        }
+
+        #power-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 3px;
+            font-family: var(--mono);
+        }
+
+        /* FLOATING SCORE POPUP */
+        .score-popup {
+            position: fixed;
+            pointer-events: none;
+            z-index: 80;
+            font-family: var(--font);
+            font-weight: 900;
+            animation: floatUp 1.2s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-80px) scale(1.4);
+            }
+        }
+
+        /* MAIN MENU */
+        #main-menu {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, #0a1628 0%, #060a12 70%);
+        }
+
+        .menu-content {
+            text-align: center;
+            max-width: 520px;
+            width: 100%;
+            padding: 0 20px;
+        }
+
+        .game-title {
+            font-size: 72px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            background: linear-gradient(135deg, var(--neon) 0%, var(--gold) 50%, var(--neon2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
+            line-height: 1;
+            filter: drop-shadow(0 0 30px rgba(0, 255, 231, 0.4));
+        }
+
+        .game-sub {
+            font-size: 11px;
+            color: rgba(0, 255, 231, 0.6);
+            letter-spacing: 6px;
+            margin: 10px 0 40px;
+        }
+
+        .mode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            background: var(--glass);
+            border: 1.5px solid rgba(0, 255, 231, 0.3);
+            border-radius: 10px;
+            padding: 14px 10px;
+            cursor: pointer;
+            transition: all .2s;
+            color: #fff;
+        }
+
+        .mode-btn:hover,
+        .mode-btn.selected {
+            border-color: var(--neon);
+            background: rgba(0, 255, 231, 0.12);
+            box-shadow: 0 0 20px rgba(0, 255, 231, 0.2);
+        }
+
+        .mode-btn .mode-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .mode-btn .mode-name {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--neon);
+        }
+
+        .mode-btn .mode-desc {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 3px;
+        }
+
+        .big-btn {
+            width: 100%;
+            padding: 16px;
+            font-family: var(--font);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all .2s;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--neon), #0088cc);
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 231, 0.4);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 40px rgba(0, 255, 231, 0.6);
+        }
+
+        .btn-settings {
+            background: transparent;
+            color: var(--neon);
+            border: 1.5px solid rgba(0, 255, 231, 0.3);
+            margin-top: 6px;
+        }
+
+        .btn-settings:hover {
+            background: var(--glass);
+        }
+
+        /* SETTINGS PANEL */
+        #settings-panel {
+            position: fixed;
+            inset: 0;
+            z-index: 300;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 10, 18, 0.92);
+        }
+
+        #settings-panel.open {
+            display: flex;
+        }
+
+        .settings-box {
+            background: #0a1120;
+            border: 1.5px solid rgba(0, 255, 231, 0.25);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 600px;
+            width: 95%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .settings-box h2 {
+            font-size: 16px;
+            color: var(--neon);
+            letter-spacing: 4px;
+            margin-bottom: 20px;
+        }
+
+        .settings-section {
+            margin-bottom: 18px;
+        }
+
+        .settings-section h3 {
+            font-size: 9px;
+            color: rgba(0, 255, 231, 0.5);
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 255, 231, 0.1);
+            padding-bottom: 4px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .setting-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 1px;
+        }
+
+        .setting-val {
+            font-size: 11px;
+            color: var(--neon);
+            font-family: var(--mono);
+            min-width: 40px;
+            text-align: right;
+        }
+
+        input[type=range] {
+            width: 160px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(0, 255, 231, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--neon);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--neon);
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .toggle-opt {
+            padding: 4px 10px;
+            font-size: 9px;
+            font-family: var(--font);
+            letter-spacing: 1px;
+            border: 1px solid rgba(0, 255, 231, 0.2);
+            border-radius: 5px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.5);
+            transition: all .15s;
+            background: none;
+        }
+
+        .toggle-opt.active {
+            border-color: var(--neon);
+            color: var(--neon);
+            background: rgba(0, 255, 231, 0.1);
+        }
+
+        /* PAUSE / GAMEOVER */
+        #overlay-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 150;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 10, 18, 0.88);
+            backdrop-filter: blur(4px);
+        }
+
+        #overlay-screen.show {
+            display: flex;
+        }
+
+        .overlay-box {
+            text-align: center;
+        }
+
+        .overlay-title {
+            font-size: 52px;
+            font-weight: 900;
+            letter-spacing: 6px;
+            margin-bottom: 10px;
+        }
+
+        .overlay-score {
+            font-size: 20px;
+            color: var(--gold);
+            margin-bottom: 6px;
+        }
+
+        .overlay-detail {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        .overlay-btns {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .overlay-btn {
+            padding: 12px 28px;
+            font-family: var(--font);
+            font-size: 11px;
+            letter-spacing: 3px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            border: none;
+            transition: all .2s;
+        }
+
+        .btn-primary {
+            background: var(--neon);
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 231, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #fff;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            border-color: #fff;
+        }
+
+        /* LEADERBOARD */
+        #leaderboard-panel {
+            position: fixed;
+            inset: 0;
+            z-index: 310;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 10, 18, 0.94);
+        }
+
+        #leaderboard-panel.open {
+            display: flex;
+        }
+
+        .lb-box {
+            background: #0a1120;
+            border: 1.5px solid rgba(255, 215, 0, 0.25);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 420px;
+            width: 95%;
+        }
+
+        .lb-box h2 {
+            font-size: 14px;
+            color: var(--gold);
+            letter-spacing: 4px;
+            margin-bottom: 16px;
+        }
+
+        .lb-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .lb-rank {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            width: 24px;
+        }
+
+        .lb-name {
+            font-size: 11px;
+            color: #fff;
+            flex: 1;
+            padding: 0 10px;
+        }
+
+        .lb-score {
+            font-size: 13px;
+            color: var(--gold);
+            font-family: var(--mono);
+        }
+
+        .lb-mode {
+            font-size: 9px;
+            color: rgba(0, 255, 231, 0.5);
+            margin-left: 8px;
+        }
+
+        /* CALIBRATION */
+        #calibration-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 250;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 10, 18, 0.96);
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #calibration-screen.show {
+            display: flex;
+        }
+
+        #calib-title {
+            font-size: 20px;
+            color: var(--neon);
+            letter-spacing: 4px;
+        }
+
+        #calib-instruction {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 2px;
+            text-align: center;
+            max-width: 340px;
+        }
+
+        #calib-box {
+            width: 280px;
+            height: 210px;
+            border: 2px dashed rgba(0, 255, 231, 0.4);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #calib-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #calib-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--neon2);
+            box-shadow: 0 0 12px var(--neon2);
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: left .1s, top .1s;
+        }
+
+        #calib-progress {
+            width: 280px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        #calib-bar {
+            height: 4px;
+            background: var(--neon);
+            border-radius: 2px;
+            width: 0%;
+            transition: width .3s;
+        }
+
+        #calib-status {
+            font-size: 11px;
+            color: var(--neon);
+            letter-spacing: 2px;
+            font-family: var(--mono);
+        }
+
+        /* QUICK CONTROLS BAR */
+        #quick-controls {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .qc-btn {
+            background: var(--panel);
+            border: 1px solid rgba(0, 255, 231, 0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--neon);
+            font-size: 10px;
+            letter-spacing: 2px;
+            font-family: var(--font);
+            transition: all .15s;
+            backdrop-filter: blur(6px);
+        }
+
+        .qc-btn:hover {
+            background: var(--glass);
+            border-color: var(--neon);
+        }
+
+        /* TRAJECTORY */
+        #traj-toggle {}
+
+        /* AMMO INDICATOR */
+        #ammo-row {
+            position: fixed;
+            bottom: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            gap: 6px;
+        }
+
+        .ammo-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--gold);
+            box-shadow: 0 0 6px var(--gold);
+            transition: all .2s;
+        }
+
+        .ammo-dot.used {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        /* FPS */
+        #fps-counter {
+            position: fixed;
+            top: 50%;
+            right: 10px;
+            z-index: 50;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.2);
+            font-family: var(--mono);
+            transform: translateY(-50%);
+        }
+
+        /* SCREEN FLASH */
+        #screen-flash {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .05s;
+        }
+
+        /* NOTIFICATION */
+        #notification {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 90;
+            background: var(--panel);
+            border: 1px solid rgba(0, 255, 231, 0.3);
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 11px;
+            color: var(--neon);
+            letter-spacing: 2px;
+            opacity: 0;
+            transition: opacity .3s;
+            pointer-events: none;
+        }
+
+        #notification.show {
+            opacity: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 231, 0.3);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container">
+        <canvas id="three-canvas"></canvas>
+    </div>
+
+    <!-- Screen flash effect -->
+    <div id="screen-flash"></div>
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+        <svg id="crosshair-svg" width="50" height="50" viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="18" stroke="#00ffe7" stroke-width="1" fill="none" opacity="0.5" />
+            <circle cx="25" cy="25" r="3" fill="#00ffe7" opacity="0.8" />
+            <line x1="25" y1="2" x2="25" y2="12" stroke="#00ffe7" stroke-width="1.5" />
+            <line x1="25" y1="38" x2="25" y2="48" stroke="#00ffe7" stroke-width="1.5" />
+            <line x1="2" y1="25" x2="12" y2="25" stroke="#00ffe7" stroke-width="1.5" />
+            <line x1="38" y1="25" x2="48" y2="25" stroke="#00ffe7" stroke-width="1.5" />
+        </svg>
+    </div>
+
+    <!-- Webcam -->
+    <div id="webcam-wrap">
+        <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="webcam-overlay"></canvas>
+        <div id="webcam-label">◉ HAND CAM</div>
+        <div id="webcam-status" style="color:#00ffe7">INIT...</div>
+    </div>
+
+    <!-- Gesture Bar -->
+    <div id="gesture-bar">
+        <div id="gesture-name">GESTURE: IDLE</div>
+        <div id="pinch-bar-wrap">
+            <div id="pinch-bar"></div>
+        </div>
+        <div id="power-label">POWER: 0%</div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-block" id="mode-display">
+            <div id="mode-val">PRACTICE</div>
+            <div id="streak-val"></div>
+        </div>
+        <div class="hud-block" id="timer-display" style="display:none">
+            <div id="timer-val">60</div>
+            <div id="timer-label">SECONDS</div>
+        </div>
+        <div class="hud-block" id="score-display">
+            <div id="score-label">SCORE</div>
+            <div id="score-val">0</div>
+            <div id="combo-display"></div>
+        </div>
+    </div>
+
+    <!-- Ammo -->
+    <div id="ammo-row"></div>
+
+    <!-- FPS -->
+    <div id="fps-counter">60 FPS</div>
+
+    <!-- Notification -->
+    <div id="notification"></div>
+
+    <!-- Quick Controls -->
+    <div id="quick-controls">
+        <button class="qc-btn" onclick="Game.togglePause()">⏸ PAUSE</button>
+        <button class="qc-btn" id="traj-toggle" onclick="Game.toggleTrajectory()">⊙ TRAJECTORY</button>
+        <button class="qc-btn" onclick="Game.toggleWebcam()">📷 CAM</button>
+        <button class="qc-btn" onclick="openSettings()">⚙ SETTINGS</button>
+        <button class="qc-btn" onclick="openLeaderboard()">🏆 SCORES</button>
+        <button class="qc-btn" onclick="showMenu()">← MENU</button>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu">
+        <div class="menu-content">
+            <div class="game-title">ARCHER X</div>
+            <div class="game-sub">HAND-CONTROLLED 3D SHOOTING</div>
+            <div class="mode-grid">
+                <div class="mode-btn selected" onclick="selectMode('practice', this)">
+                    <div class="mode-icon">🎯</div>
+                    <div class="mode-name">PRACTICE</div>
+                    <div class="mode-desc">No timer • Learn controls</div>
+                </div>
+                <div class="mode-btn" onclick="selectMode('time60', this)">
+                    <div class="mode-icon">⏱</div>
+                    <div class="mode-name">TIME ATTACK</div>
+                    <div class="mode-desc">60 seconds • Score high</div>
+                </div>
+                <div class="mode-btn" onclick="selectMode('endless', this)">
+                    <div class="mode-icon">∞</div>
+                    <div class="mode-name">ENDLESS</div>
+                    <div class="mode-desc">Survive • Miss = Game Over</div>
+                </div>
+                <div class="mode-btn" onclick="selectMode('challenge', this)">
+                    <div class="mode-icon">🔥</div>
+                    <div class="mode-name">CHALLENGE</div>
+                    <div class="mode-desc">Fast targets • Scaling diff</div>
+                </div>
+            </div>
+            <button class="big-btn btn-start" onclick="startGame()">▶ START GAME</button>
+            <button class="big-btn btn-settings" onclick="openSettings()">⚙ SETTINGS</button>
+            <button class="big-btn btn-settings" onclick="openLeaderboard()">🏆 LEADERBOARD</button>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel">
+        <div class="settings-box">
+            <h2>⚙ SETTINGS</h2>
+            <div class="settings-section">
+                <h3>CONTROLS</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Hand Sensitivity</span>
+                    <input type="range" min="1" max="10" value="5" id="s-sensitivity"
+                        oninput="updateSetting('sensitivity', this.value)">
+                    <span class="setting-val" id="sv-sensitivity">5</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Pinch Threshold</span>
+                    <input type="range" min="10" max="80" value="35" id="s-pinch"
+                        oninput="updateSetting('pinch', this.value)">
+                    <span class="setting-val" id="sv-pinch">35</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Camera Smoothing</span>
+                    <input type="range" min="1" max="20" value="8" id="s-smooth"
+                        oninput="updateSetting('smooth', this.value)">
+                    <span class="setting-val" id="sv-smooth">8</span>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>GAMEPLAY</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Target Speed</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active"
+                            onclick="setToggle('targetSpeed','static',this)">STATIC</button>
+                        <button class="toggle-opt" onclick="setToggle('targetSpeed','slow',this)">SLOW</button>
+                        <button class="toggle-opt" onclick="setToggle('targetSpeed','medium',this)">MED</button>
+                        <button class="toggle-opt" onclick="setToggle('targetSpeed','fast',this)">FAST</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Target Size</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt" onclick="setToggle('targetSize','small',this)">SMALL</button>
+                        <button class="toggle-opt active" onclick="setToggle('targetSize','medium',this)">MED</button>
+                        <button class="toggle-opt" onclick="setToggle('targetSize','large',this)">LARGE</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Target Movement</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt" onclick="setToggle('targetMove','horizontal',this)">HORIZ</button>
+                        <button class="toggle-opt active"
+                            onclick="setToggle('targetMove','circular',this)">CIRC</button>
+                        <button class="toggle-opt" onclick="setToggle('targetMove','random',this)">RAND</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Spawn Rate</span>
+                    <input type="range" min="1" max="10" value="4" id="s-spawnrate"
+                        oninput="updateSetting('spawnrate', this.value)">
+                    <span class="setting-val" id="sv-spawnrate">4</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Gravity Strength</span>
+                    <input type="range" min="1" max="20" value="8" id="s-gravity"
+                        oninput="updateSetting('gravity', this.value)">
+                    <span class="setting-val" id="sv-gravity">8</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Miss Penalty</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active" onclick="setToggle('misspeno','off',this)">OFF</button>
+                        <button class="toggle-opt" onclick="setToggle('misspeno','on',this)">ON</button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>VISUAL</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Theme</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active" onclick="setToggle('theme','neon',this)">NEON</button>
+                        <button class="toggle-opt" onclick="setToggle('theme','dark',this)">DARK</button>
+                        <button class="toggle-opt" onclick="setToggle('theme','minimal',this)">MIN</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Crosshair Style</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active"
+                            onclick="setToggle('crosshair','default',this)">DEFAULT</button>
+                        <button class="toggle-opt" onclick="setToggle('crosshair','dot',this)">DOT</button>
+                        <button class="toggle-opt" onclick="setToggle('crosshair','cross',this)">CROSS</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Particle Effects</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active" onclick="setToggle('particles','on',this)">ON</button>
+                        <button class="toggle-opt" onclick="setToggle('particles','off',this)">OFF</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label">Trajectory Line</span>
+                    <div class="toggle-group">
+                        <button class="toggle-opt active" onclick="setToggle('trajectory','on',this)">ON</button>
+                        <button class="toggle-opt" onclick="setToggle('trajectory','off',this)">OFF</button>
+                    </div>
+                </div>
+            </div>
+            <button class="big-btn btn-start" onclick="closeSettings()" style="margin-top:10px">✓ APPLY & CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div id="leaderboard-panel">
+        <div class="lb-box">
+            <h2>🏆 LEADERBOARD</h2>
+            <div id="lb-entries"></div>
+            <button class="big-btn btn-settings" onclick="closeLeaderboard()"
+                style="margin-top:16px; font-size:11px; letter-spacing:2px; padding:10px">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Calibration Screen -->
+    <div id="calibration-screen">
+        <div id="calib-title">HAND CALIBRATION</div>
+        <div id="calib-instruction">Hold your index finger up and move it to calibrate tracking accuracy. Hold still at
+            center to confirm.</div>
+        <div id="calib-box">
+            <video id="calib-video" autoplay muted playsinline></video>
+            <div id="calib-dot"></div>
+        </div>
+        <div id="calib-progress">
+            <div id="calib-bar"></div>
+        </div>
+        <div id="calib-status">DETECTING HAND...</div>
+        <button class="big-btn btn-start" onclick="skipCalibration()" style="width:200px; margin-top:0">SKIP →</button>
+    </div>
+
+    <!-- Overlay (Pause / Game Over) -->
+    <div id="overlay-screen">
+        <div class="overlay-box">
+            <div class="overlay-title" id="overlay-title">PAUSED</div>
+            <div class="overlay-score" id="overlay-score"></div>
+            <div class="overlay-detail" id="overlay-detail"></div>
+            <div class="overlay-btns">
+                <button class="overlay-btn btn-primary" id="overlay-action" onclick="overlayAction()">RESUME</button>
+                <button class="overlay-btn btn-secondary" onclick="showMenu()">MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.min.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1620248257/drawing_utils.js"
+        crossorigin="anonymous"></script>
+
+    <script>
+        // ============================================================
+        // SETTINGS STATE
+        // ============================================================
+        const Settings = {
+            sensitivity: 5,
+            pinch: 45,
+            smooth: 8,
+            targetSpeed: 'static',
+            targetSize: 'medium',
+            targetMove: 'circular',
+            spawnrate: 4,
+            gravity: 8,
+            misspeno: 'off',
+            theme: 'neon',
+            crosshair: 'default',
+            particles: 'on',
+            trajectory: 'on'
+        };
+
+        function updateSetting(key, val) {
+            Settings[key] = parseFloat(val);
+            document.getElementById('sv-' + key).textContent = val;
+            applySettingsLive();
+        }
+
+        function setToggle(key, val, el) {
+            Settings[key] = val;
+            el.closest('.toggle-group').querySelectorAll('.toggle-opt').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            applySettingsLive();
+        }
+
+        function applySettingsLive() {
+            if (window.Game) {
+                Game.applySettings();
+            }
+            // Theme
+            if (Settings.theme === 'dark') {
+                document.documentElement.style.setProperty('--neon', '#7777ff');
+                document.documentElement.style.setProperty('--neon2', '#ff7700');
+            } else if (Settings.theme === 'minimal') {
+                document.documentElement.style.setProperty('--neon', '#ffffff');
+                document.documentElement.style.setProperty('--neon2', '#aaaaaa');
+            } else {
+                document.documentElement.style.setProperty('--neon', '#00ffe7');
+                document.documentElement.style.setProperty('--neon2', '#ff2d78');
+            }
+            // Crosshair
+            updateCrosshairStyle();
+            // Trajectory btn
+            const trajBtn = document.getElementById('traj-toggle');
+            if (trajBtn) trajBtn.style.opacity = Settings.trajectory === 'on' ? '1' : '0.4';
+        }
+
+        function updateCrosshairStyle() {
+            const svg = document.getElementById('crosshair-svg');
+            if (!svg) return;
+            if (Settings.crosshair === 'dot') {
+                svg.innerHTML = `<circle cx="25" cy="25" r="5" fill="#00ffe7" opacity="0.9"/><circle cx="25" cy="25" r="12" stroke="#00ffe7" stroke-width="1" fill="none" opacity="0.3"/>`;
+            } else if (Settings.crosshair === 'cross') {
+                svg.innerHTML = `<line x1="25" y1="0" x2="25" y2="50" stroke="#00ffe7" stroke-width="1.5" opacity="0.7"/><line x1="0" y1="25" x2="50" y2="25" stroke="#00ffe7" stroke-width="1.5" opacity="0.7"/><circle cx="25" cy="25" r="3" fill="#00ffe7"/>`;
+            } else {
+                svg.innerHTML = `<circle cx="25" cy="25" r="18" stroke="#00ffe7" stroke-width="1" fill="none" opacity="0.5"/><circle cx="25" cy="25" r="3" fill="#00ffe7" opacity="0.8"/><line x1="25" y1="2" x2="25" y2="12" stroke="#00ffe7" stroke-width="1.5"/><line x1="25" y1="38" x2="25" y2="48" stroke="#00ffe7" stroke-width="1.5"/><line x1="2" y1="25" x2="12" y2="25" stroke="#00ffe7" stroke-width="1.5"/><line x1="38" y1="25" x2="48" y2="25" stroke="#00ffe7" stroke-width="1.5"/>`;
+            }
+        }
+
+        // ============================================================
+        // MODE & MENU
+        // ============================================================
+        let selectedMode = 'practice';
+
+        function selectMode(mode, el) {
+            selectedMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        function showMenu() {
+            if (window.Game && Game.running) Game.stop();
+            document.getElementById('main-menu').style.display = 'flex';
+            document.getElementById('overlay-screen').classList.remove('show');
+        }
+
+        function startGame() {
+            document.getElementById('main-menu').style.display = 'none';
+            // Show calibration if camera available
+            if (HandTracker.cameraReady) {
+                showCalibration();
+            } else {
+                initGameMode();
+            }
+        }
+
+        function initGameMode() {
+            document.getElementById('calibration-screen').classList.remove('show');
+            if (!window.Game) {
+                window.Game = new GameEngine();
+            }
+            Game.startMode(selectedMode);
+        }
+
+        function openSettings() { document.getElementById('settings-panel').classList.add('open'); }
+        function closeSettings() { document.getElementById('settings-panel').classList.remove('open'); }
+        function openLeaderboard() { renderLeaderboard(); document.getElementById('leaderboard-panel').classList.add('open'); }
+        function closeLeaderboard() { document.getElementById('leaderboard-panel').classList.remove('open'); }
+
+        // ============================================================
+        // OVERLAY
+        // ============================================================
+        function showOverlay(title, score, detail, actionLabel) {
+            const el = document.getElementById('overlay-screen');
+            document.getElementById('overlay-title').textContent = title;
+            document.getElementById('overlay-score').textContent = score ? `SCORE: ${score}` : '';
+            document.getElementById('overlay-detail').textContent = detail || '';
+            document.getElementById('overlay-action').textContent = actionLabel || 'RESUME';
+            el.classList.add('show');
+        }
+        function hideOverlay() { document.getElementById('overlay-screen').classList.remove('show'); }
+        function overlayAction() {
+            const actionLabel = document.getElementById('overlay-action').textContent;
+            if (actionLabel === 'RESUME') {
+                Game.resume();
+                hideOverlay();
+            } else if (actionLabel === 'PLAY AGAIN') {
+                hideOverlay();
+                Game.startMode(selectedMode);
+            }
+        }
+
+        // ============================================================
+        // NOTIFICATION
+        // ============================================================
+        let notifTimer;
+        function showNotif(msg) {
+            const el = document.getElementById('notification');
+            el.textContent = msg;
+            el.classList.add('show');
+            clearTimeout(notifTimer);
+            notifTimer = setTimeout(() => el.classList.remove('show'), 2000);
+        }
+
+        // ============================================================
+        // LEADERBOARD
+        // ============================================================
+        function saveScore(score, mode) {
+            const lb = JSON.parse(localStorage.getItem('archerx_lb') || '[]');
+            lb.push({ score, mode, date: new Date().toLocaleDateString() });
+            lb.sort((a, b) => b.score - a.score);
+            lb.splice(10);
+            localStorage.setItem('archerx_lb', JSON.stringify(lb));
+        }
+
+        function renderLeaderboard() {
+            const lb = JSON.parse(localStorage.getItem('archerx_lb') || '[]');
+            const el = document.getElementById('lb-entries');
+            if (lb.length === 0) {
+                el.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:11px;padding:20px 0;text-align:center;letter-spacing:2px;">NO SCORES YET</div>';
+                return;
+            }
+            el.innerHTML = lb.map((e, i) => `
+    <div class="lb-entry">
+      <div class="lb-rank">${i + 1}</div>
+      <div class="lb-name">PLAYER</div>
+      <div class="lb-score">${e.score}<span class="lb-mode">${e.mode.toUpperCase()}</span></div>
+    </div>`).join('');
+        }
+
+        // ============================================================
+        // CALIBRATION
+        // ============================================================
+        let calibTimer = null;
+        let calibProgress = 0;
+
+        function showCalibration() {
+            const screen = document.getElementById('calibration-screen');
+            screen.classList.add('show');
+            calibProgress = 0;
+            document.getElementById('calib-bar').style.width = '0%';
+            // connect calibration video to same stream
+            const calibVid = document.getElementById('calib-video');
+            if (HandTracker.stream) calibVid.srcObject = HandTracker.stream;
+        }
+
+        function updateCalibration(x, y) {
+            const dot = document.getElementById('calib-dot');
+            const box = document.getElementById('calib-box');
+            const bw = box.offsetWidth, bh = box.offsetHeight;
+            // mirror x
+            dot.style.left = ((1 - x) * bw) + 'px';
+            dot.style.top = (y * bh) + 'px';
+
+            const cx = Math.abs(x - 0.5), cy = Math.abs(y - 0.5);
+            if (cx < 0.15 && cy < 0.15) {
+                calibProgress = Math.min(100, calibProgress + 2);
+                document.getElementById('calib-bar').style.width = calibProgress + '%';
+                document.getElementById('calib-status').textContent = `CALIBRATING... ${Math.round(calibProgress)}%`;
+                if (calibProgress >= 100) {
+                    document.getElementById('calib-status').textContent = 'CALIBRATED ✓';
+                    setTimeout(initGameMode, 600);
+                }
+            } else {
+                calibProgress = Math.max(0, calibProgress - 1);
+                document.getElementById('calib-bar').style.width = calibProgress + '%';
+                document.getElementById('calib-status').textContent = `MOVE TO CENTER`;
+            }
+        }
+
+        function skipCalibration() { initGameMode(); }
+
+        // ============================================================
+        // HAND TRACKER
+        // ============================================================
+        const HandTracker = {
+            hands: null,
+            camera: null,
+            stream: null,
+            cameraReady: false,
+            landmarks: null,
+            indexPos: { x: 0.5, y: 0.5 },
+            smoothX: 0.5,
+            smoothY: 0.5,
+            pinchDist: 999,
+            pinchDuration: 0,
+            isShooting: false,
+            shootTriggered: false,
+            gestureState: 'IDLE',
+            aimX: 0.5,
+            aimY: 0.5,
+
+            async init() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+                    const video = document.getElementById('webcam');
+                    video.srcObject = this.stream;
+                    document.getElementById('webcam-status').textContent = 'ACTIVE';
+                    document.getElementById('webcam-status').style.color = '#00ffe7';
+                    this.cameraReady = true;
+
+                    if (typeof Hands !== 'undefined') {
+                        this.hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+                        this.hands.setOptions({
+                            maxNumHands: 1,
+                            modelComplexity: 0,
+                            minDetectionConfidence: 0.6,
+                            minTrackingConfidence: 0.5
+                        });
+                        this.hands.onResults(r => this.onResults(r));
+
+                        this.camera = new Camera(video, {
+                            onFrame: async () => { await this.hands.send({ image: video }); },
+                            width: 320, height: 240
+                        });
+                        this.camera.start();
+                        this.drawLandmarksLoop();
+                    } else {
+                        this.simulateMode();
+                    }
+                } catch (e) {
+                    console.warn('Camera not available, using mouse fallback:', e);
+                    document.getElementById('webcam-status').textContent = 'MOUSE MODE';
+                    document.getElementById('webcam-status').style.color = '#ff2d78';
+                    this.simulateMode();
+                }
+            },
+
+            simulateMode() {
+                // Mouse-based fallback
+                document.addEventListener('mousemove', e => {
+                    this.indexPos.x = 1 - e.clientX / window.innerWidth;
+                    this.indexPos.y = e.clientY / window.innerHeight;
+                });
+                document.addEventListener('mousedown', () => { this.isShooting = true; this.shootTriggered = true; });
+                document.addEventListener('mouseup', () => { this.isShooting = false; this.shootTriggered = false; });
+                document.getElementById('webcam-status').textContent = 'MOUSE MODE';
+                document.getElementById('webcam-status').style.color = '#ffd700';
+                showNotif('MOUSE MODE: Move mouse to aim, click to shoot');
+            },
+
+            onResults(results) {
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    this.landmarks = results.multiHandLandmarks[0];
+                    const index = this.landmarks[8];
+                    this.indexPos.x = index.x;
+                    this.indexPos.y = index.y;
+
+                    const thumb = this.landmarks[4];
+                    const dx = index.x - thumb.x, dy = index.y - thumb.y;
+                    this.pinchDist = Math.sqrt(dx * dx + dy * dy) * 100;
+
+                    this.classifyGesture();
+                    if (window.Game && window.Game.calibrating) updateCalibration(index.x, index.y);
+                } else {
+                    this.landmarks = null;
+                    this.gestureState = 'IDLE';
+                    this.isShooting = false;
+                }
+            },
+
+            classifyGesture() {
+                if (!this.landmarks) return;
+
+                // 1. Check for Index Extended (Aiming)
+                const isIndexExtended = this.landmarks[8].y < this.landmarks[6].y;
+                
+                // 2. Check for Middle, Ring, Pinky curled (Pistol Shape)
+                const isMiddleCurled = this.landmarks[12].y > this.landmarks[9].y;
+                const isRingCurled = this.landmarks[16].y > this.landmarks[13].y;
+                
+                const isPistolPose = isIndexExtended && isMiddleCurled && isRingCurled;
+
+                // 3. Trigger: Thumb distance to Index MCP (base of index)
+                const t4 = this.landmarks[4], i5 = this.landmarks[5];
+                const dx = t4.x - i5.x, dy = t4.y - i5.y;
+                const thumbDist = Math.sqrt(dx*dx + dy*dy) * 100;
+                
+                // Shooting threshold: thumb is pulled down towards the hand
+                const isShootingTriggered = isPistolPose && thumbDist < 13;
+
+                if (isShootingTriggered) {
+                    this.pinchDuration++;
+                    this.gestureState = 'SHOOT';
+                    if (this.pinchDuration === 1) {
+                        this.isShooting = true;
+                        this.shootTriggered = true;
+                    }
+                } else {
+                    this.pinchDuration = 0;
+                    this.isShooting = false;
+                    this.shootTriggered = false;
+                    
+                    if (isPistolPose) {
+                        this.gestureState = 'READY';
+                    } else {
+                        // Check for Fist (Pause)
+                        const tips = [8, 12, 16, 20], mcps = [5, 9, 13, 17];
+                        let curled = 0;
+                        for (let i = 0; i < tips.length; i++) {
+                            if (this.landmarks[tips[i]].y > this.landmarks[mcps[i]].y) curled++;
+                        }
+                        this.gestureState = curled >= 3 ? 'FIST' : 'OPEN';
+                    }
+                }
+
+                // Update UI
+                const names = { 
+                    SHOOT: '🔫 GUN — BANG!', 
+                    READY: '🔫 GUN — READY', 
+                    FIST: '✊ FIST — PAUSE AIM', 
+                    OPEN: '🖐 OPEN — IDLE', 
+                    IDLE: '— NO HAND DETECTED' 
+                };
+                document.getElementById('gesture-name').textContent = 'GESTURE: ' + (names[this.gestureState] || this.gestureState);
+                
+                // Update trigger bar
+                const barVal = isPistolPose ? Math.max(0, 100 - thumbDist * 4) : 0;
+                document.getElementById('pinch-bar').style.width = barVal + '%';
+                document.getElementById('power-label').textContent = isPistolPose ? `TRIGGER: ${Math.round(Math.max(0, 100 - thumbDist * 4))}%` : `POWER: 0%`;
+            },
+
+            update() {
+                const sf = (21 - Settings.smooth) / 200;
+                this.smoothX += (this.indexPos.x - this.smoothX) * sf;
+                this.smoothY += (this.indexPos.y - this.smoothY) * sf;
+
+                const sens = Settings.sensitivity / 5;
+                this.aimX = Math.max(0, Math.min(1, (this.smoothX - 0.5) * sens + 0.5));
+                this.aimY = Math.max(0, Math.min(1, (this.smoothY - 0.5) * sens + 0.5));
+            },
+
+            drawLandmarksLoop() {
+                const canvas = document.getElementById('webcam-overlay');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 180; canvas.height = 135;
+
+                const draw = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    if (this.landmarks) {
+                        ctx.save();
+                        ctx.scale(-1, 1);
+                        ctx.translate(-canvas.width, 0);
+                        // Draw connections
+                        const conns = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [0, 9], [9, 10], [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16], [0, 17], [17, 18], [18, 19], [19, 20]];
+                        ctx.strokeStyle = 'rgba(0,255,231,0.4)';
+                        ctx.lineWidth = 1;
+                        for (const [a, b] of conns) {
+                            ctx.beginPath();
+                            ctx.moveTo(this.landmarks[a].x * canvas.width, this.landmarks[a].y * canvas.height);
+                            ctx.lineTo(this.landmarks[b].x * canvas.width, this.landmarks[b].y * canvas.height);
+                            ctx.stroke();
+                        }
+                        // Landmarks
+                        this.landmarks.forEach((lm, i) => {
+                            const color = (i === 4 || i === 8) ? '#ff2d78' : '#00ffe7';
+                            ctx.beginPath();
+                            ctx.arc(lm.x * canvas.width, lm.y * canvas.height, i === 8 ? 5 : 3, 0, Math.PI * 2);
+                            ctx.fillStyle = color;
+                            ctx.fill();
+                        });
+                        ctx.restore();
+                    }
+                    requestAnimationFrame(draw);
+                };
+                draw();
+            }
+        };
+
+        // ============================================================
+        // 3D GAME ENGINE
+        // ============================================================
+        class GameEngine {
+            constructor() {
+                this.running = false;
+                this.paused = false;
+                this.score = 0;
+                this.streak = 0;
+                this.maxStreak = 0;
+                this.combo = 1;
+                this.totalShots = 0;
+                this.totalHits = 0;
+                this.missCount = 0;
+                this.timeLeft = 60;
+                this.gameMode = 'practice';
+                this.showTrajectory = true;
+                this.webcamVisible = true;
+                this.targets = [];
+                this.projectiles = [];
+                this.particles = [];
+                this.trajectoryPoints = [];
+                this.spawnTimer = 0;
+                this.diffScale = 1;
+                this.lastFps = 60;
+                this._fpsFrames = 0;
+                this._fpsTime = 0;
+                this.calibrating = false;
+                this.lastShootState = false;
+                this.gameOverShown = false;
+                this.ammo = 10;
+                this.maxAmmo = 10;
+                this._shakeIntensity = 0;
+
+                this.initThree();
+                this.buildScene();
+                this.applySettings();
+                this.buildAmmoUI();
+                this.loop = this.loop.bind(this);
+                requestAnimationFrame(this.loop);
+            }
+
+            initThree() {
+                const canvas = document.getElementById('three-canvas');
+                this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x060a12);
+                this.scene.fog = new THREE.FogExp2(0x060a12, 0.018);
+
+                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+                this.camera.position.set(0, 2, 12);
+                this.camera.lookAt(0, 0, 0);
+
+                // Clock
+                this.clock = new THREE.Clock();
+
+                window.addEventListener('resize', () => {
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                });
+            }
+
+            buildScene() {
+                // Ambient
+                const ambient = new THREE.AmbientLight(0x0a1a2a, 1.5);
+                this.scene.add(ambient);
+
+                // Main directional
+                const dir = new THREE.DirectionalLight(0x00ffe7, 0.8);
+                dir.position.set(5, 10, 5);
+                dir.castShadow = true;
+                dir.shadow.mapSize.set(1024, 1024);
+                this.scene.add(dir);
+
+                // Fill
+                const fill = new THREE.PointLight(0xff2d78, 0.6, 40);
+                fill.position.set(-8, 4, 2);
+                this.scene.add(fill);
+
+                const fill2 = new THREE.PointLight(0x00ffe7, 0.4, 40);
+                fill2.position.set(8, 4, 2);
+                this.scene.add(fill2);
+
+                // Floor
+                const floorGeo = new THREE.PlaneGeometry(80, 80, 20, 20);
+                const floorMat = new THREE.MeshStandardMaterial({
+                    color: 0x050a14, roughness: 0.9, metalness: 0.1,
+                    wireframe: false
+                });
+                const floor = new THREE.Mesh(floorGeo, floorMat);
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.y = -3;
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+
+                // Grid lines on floor
+                const gridHelper = new THREE.GridHelper(60, 30, 0x001a2a, 0x001a2a);
+                gridHelper.position.y = -2.99;
+                this.scene.add(gridHelper);
+
+                // Back wall
+                const wallGeo = new THREE.PlaneGeometry(50, 20);
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0x040810, roughness: 1 });
+                const wall = new THREE.Mesh(wallGeo, wallMat);
+                wall.position.set(0, 5, -25);
+                wall.receiveShadow = true;
+                this.scene.add(wall);
+
+                // Ceiling lights (atmospheric)
+                for (let i = -3; i <= 3; i++) {
+                    const stripGeo = new THREE.BoxGeometry(0.1, 0.05, 6);
+                    const stripMat = new THREE.MeshBasicMaterial({ color: 0x00ffe7 });
+                    const strip = new THREE.Mesh(stripGeo, stripMat);
+                    strip.position.set(i * 2.5, 8, -5);
+                    this.scene.add(strip);
+
+                    const pl = new THREE.PointLight(0x00ffe7, 0.15, 8);
+                    pl.position.copy(strip.position);
+                    this.scene.add(pl);
+                }
+
+                // Trajectory line
+                this.trajLine = this.createTrajectoryLine();
+                this.scene.add(this.trajLine);
+
+                // Spawn initial targets
+                for (let i = 0; i < 3; i++) this.spawnTarget();
+            }
+
+            createTrajectoryLine() {
+                const points = Array(20).fill(new THREE.Vector3(0, 0, 0));
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const mat = new THREE.LineDashedMaterial({
+                    color: 0xffd700, opacity: 0.5, transparent: true,
+                    dashSize: 0.3, gapSize: 0.2, linewidth: 1
+                });
+                const line = new THREE.Line(geo, mat);
+                line.computeLineDistances();
+                line.visible = false;
+                return line;
+            }
+
+            buildAmmoUI() {
+                const row = document.getElementById('ammo-row');
+                row.innerHTML = '';
+                for (let i = 0; i < this.maxAmmo; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'ammo-dot';
+                    dot.id = `ammo-${i}`;
+                    row.appendChild(dot);
+                }
+            }
+
+            updateAmmoUI() {
+                for (let i = 0; i < this.maxAmmo; i++) {
+                    const dot = document.getElementById(`ammo-${i}`);
+                    if (dot) dot.classList.toggle('used', i >= this.ammo);
+                }
+            }
+
+            spawnTarget() {
+                const sizeMap = { small: 0.4, medium: 0.7, large: 1.1 };
+                const size = sizeMap[Settings.targetSize] || 0.7;
+                const speedMap = { static: 0, slow: 0.008, medium: 0.018, fast: 0.035 };
+                const speed = (speedMap[Settings.targetSpeed] || 0) * this.diffScale;
+
+                const x = (Math.random() - 0.5) * 14;
+                const y = 1 + Math.random() * 5;
+                const z = -8 - Math.random() * 12;
+
+                const group = new THREE.Group();
+                group.position.set(x, y, z);
+
+                // Outer ring
+                const ringGeo = new THREE.TorusGeometry(size, size * 0.12, 12, 40);
+                const ringMat = new THREE.MeshStandardMaterial({
+                    color: 0xff2d78, emissive: 0xff2d78, emissiveIntensity: 0.5,
+                    metalness: 0.3, roughness: 0.5
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.castShadow = true;
+                group.add(ring);
+
+                // Inner ring (bullseye)
+                const innerGeo = new THREE.TorusGeometry(size * 0.45, size * 0.08, 8, 32);
+                const innerMat = new THREE.MeshStandardMaterial({
+                    color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 0.6
+                });
+                const inner = new THREE.Mesh(innerGeo, innerMat);
+                group.add(inner);
+
+                // Center dot
+                const dotGeo = new THREE.SphereGeometry(size * 0.12, 8, 8);
+                const dotMat = new THREE.MeshStandardMaterial({
+                    color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1
+                });
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                group.add(dot);
+
+                // Glow point light
+                const glow = new THREE.PointLight(0xff2d78, 0.8, 4);
+                group.add(glow);
+
+                // Net / basket visual
+                const netGeo = new THREE.CylinderGeometry(size * 0.9, size * 0.6, size * 0.8, 8, 1, true);
+                const netMat = new THREE.MeshBasicMaterial({ color: 0x00ffe7, wireframe: true, opacity: 0.3, transparent: true });
+                const net = new THREE.Mesh(netGeo, netMat);
+                net.position.y = -size * 0.5;
+                group.add(net);
+
+                this.scene.add(group);
+
+                const moveTypes = ['horizontal', 'circular', 'random', 'none'];
+                let moveType = Settings.targetMove;
+                if (Settings.targetSpeed === 'static') moveType = 'none';
+
+                const target = {
+                    mesh: group, size, speed,
+                    moveType, baseX: x, baseY: y, baseZ: z,
+                    phase: Math.random() * Math.PI * 2,
+                    phaseY: Math.random() * Math.PI * 2,
+                    hit: false, alive: true,
+                    age: 0, maxAge: 15 + Math.random() * 10
+                };
+                this.targets.push(target);
+                return target;
+            }
+
+            shoot() {
+                if (this.ammo <= 0 && this.gameMode !== 'practice') return;
+                if (this.ammo > 0) this.ammo--;
+                this.updateAmmoUI();
+                this.totalShots++;
+
+                // Arrow mesh
+                const group = new THREE.Group();
+                const shaftGeo = new THREE.CylinderGeometry(0.04, 0.02, 1.2, 6);
+                const shaftMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 0.3 });
+                const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+                shaft.rotation.x = Math.PI / 2;
+                group.add(shaft);
+
+                const tipGeo = new THREE.ConeGeometry(0.07, 0.3, 6);
+                const tipMat = new THREE.MeshStandardMaterial({ color: 0x00ffe7, emissive: 0x00ffe7, emissiveIntensity: 0.8 });
+                const tip = new THREE.Mesh(tipGeo, tipMat);
+                tip.rotation.x = Math.PI / 2;
+                tip.position.z = -0.75;
+                group.add(tip);
+
+                // Trail light
+                const light = new THREE.PointLight(0xffd700, 1, 3);
+                group.add(light);
+
+                const screenX = (1 - HandTracker.aimX) * 2 - 1;
+                const screenY = -(HandTracker.aimY * 2 - 1);
+                const targetZ = -15;
+                const distToTarget = 12 - targetZ; 
+                const halfH = Math.tan(this.camera.fov * Math.PI / 360) * distToTarget;
+                const halfW = halfH * this.camera.aspect;
+                const tx = screenX * halfW;
+                const ty = screenY * halfH + 2; 
+
+                const sx = screenX * 5, sy = 2 + screenY * 3.5, sz = 10;
+                group.position.set(sx, sy, sz);
+
+                const time = 35; 
+                const vx = (tx - sx) / time;
+                const vz = (targetZ - sz) / time;
+                const g = Settings.gravity * 0.001;
+                const vy = (ty - sy) / time + 0.5 * g * time; 
+                const speed = Math.abs(vz);
+
+                this.scene.add(group);
+
+                this.projectiles.push({
+                    mesh: group, vx, vy, vz,
+                    alive: true, age: 0,
+                    trail: []
+                });
+
+                // Screen flash
+                const flash = document.getElementById('screen-flash');
+                flash.style.background = 'rgba(255,215,0,0.15)';
+                flash.style.opacity = '1';
+                setTimeout(() => flash.style.opacity = '0', 80);
+
+                // Replenish ammo slowly in practice
+                if (this.gameMode === 'practice' && this.ammo < this.maxAmmo) {
+                    setTimeout(() => { this.ammo = Math.min(this.maxAmmo, this.ammo + 1); this.updateAmmoUI(); }, 1500);
+                }
+            }
+
+            spawnParticles(pos, color, count = 20, big = false) {
+                if (Settings.particles !== 'on') return;
+                for (let i = 0; i < count; i++) {
+                    const geo = new THREE.SphereGeometry(big ? 0.12 : 0.06, 4, 4);
+                    const mat = new THREE.MeshBasicMaterial({ color });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.copy(pos);
+                    this.scene.add(mesh);
+
+                    const speed = big ? 0.25 : 0.15;
+                    const vx = (Math.random() - 0.5) * speed;
+                    const vy = Math.random() * speed;
+                    const vz = (Math.random() - 0.5) * speed;
+
+                    this.particles.push({ mesh, vx, vy, vz, life: 1, decay: 0.03 + Math.random() * 0.03 });
+                }
+            }
+
+            updateTrajectory() {
+                if (!this.showTrajectory || Settings.trajectory !== 'on') {
+                    this.trajLine.visible = false;
+                    return;
+                }
+                const screenX = (1 - HandTracker.aimX) * 2 - 1;
+                const screenY = -(HandTracker.aimY * 2 - 1);
+                const targetZ = -15;
+                const distToTarget = 12 - targetZ; 
+                const halfH = Math.tan(this.camera.fov * Math.PI / 360) * distToTarget;
+                const halfW = halfH * this.camera.aspect;
+                const tx = screenX * halfW;
+                const ty = screenY * halfH + 2; 
+
+                const sx = screenX * 5, sy = 2 + screenY * 3.5, sz = 10;
+                const time = 35;
+                const vx = (tx - sx) / time, vz = (targetZ - sz) / time;
+                const g = Settings.gravity * 0.001;
+                const vy = (ty - sy) / time + 0.5 * g * time;
+
+                const points = [];
+                for (let t = 0; t < 50; t++) {
+                    const px = sx + vx * t;
+                    const py = sy + vy * t - 0.5 * g * t * t;
+                    const pz = sz + vz * t;
+                    points.push(new THREE.Vector3(px, py, pz));
+                    if (pz < -40) break;
+                }
+                this.trajLine.geometry.setFromPoints(points);
+                this.trajLine.computeLineDistances();
+                this.trajLine.visible = true;
+            }
+
+            checkHits(proj) {
+                for (const target of this.targets) {
+                    if (!target.alive || target.hit) continue;
+                    const dx = proj.mesh.position.x - target.mesh.position.x;
+                    const dy = proj.mesh.position.y - target.mesh.position.y;
+                    const dz = proj.mesh.position.z - target.mesh.position.z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (dist < target.size * 1.2) {
+                        target.hit = true;
+                        target.alive = false;
+                        const isBullseye = dist < target.size * 0.5;
+                        const pts = isBullseye ? 25 : 10;
+                        this.streak++;
+                        this.maxStreak = Math.max(this.maxStreak, this.streak);
+                        this.combo = 1 + Math.floor(this.streak / 3) * 0.5;
+                        const finalPts = Math.round(pts * this.combo);
+                        this.score += finalPts;
+                        this.totalHits++;
+                        this.ammo = Math.min(this.maxAmmo, this.ammo + 2);
+                        this.updateAmmoUI();
+
+                        this.showScorePopup(target.mesh.position, finalPts, isBullseye);
+                        this.spawnParticles(target.mesh.position, isBullseye ? 0xffd700 : 0xff2d78, isBullseye ? 40 : 20, isBullseye);
+
+                        if (isBullseye) {
+                            this.slowMoFlash();
+                            showNotif(`🎯 BULLSEYE! ×${this.combo.toFixed(1)} COMBO!`);
+                        } else if (this.streak > 2) {
+                            showNotif(`🔥 ${this.streak}x STREAK!`);
+                        }
+
+                        this._shakeIntensity = isBullseye ? 0.15 : 0.05;
+
+                        // Remove target after a beat
+                        setTimeout(() => {
+                            this.scene.remove(target.mesh);
+                            this.targets = this.targets.filter(t => t !== target);
+                            this.spawnTarget();
+                        }, 200);
+
+                        proj.alive = false;
+                        this.updateHUD();
+                        return;
+                    }
+                }
+            }
+
+            showScorePopup(worldPos, pts, bullseye) {
+                const vec = worldPos.clone().project(this.camera);
+                const x = (vec.x + 1) / 2 * window.innerWidth;
+                const y = -(vec.y - 1) / 2 * window.innerHeight;
+                const el = document.createElement('div');
+                el.className = 'score-popup';
+                el.textContent = bullseye ? `+${pts} 🎯 BULLSEYE!` : `+${pts}`;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                el.style.fontSize = bullseye ? '28px' : '20px';
+                el.style.color = bullseye ? '#ffd700' : '#00ffe7';
+                document.body.appendChild(el);
+                setTimeout(() => el.remove(), 1200);
+            }
+
+            slowMoFlash() {
+                const flash = document.getElementById('screen-flash');
+                flash.style.background = 'rgba(255,215,0,0.08)';
+                flash.style.opacity = '1';
+                setTimeout(() => flash.style.opacity = '0', 300);
+            }
+
+            miss() {
+                this.streak = 0;
+                this.combo = 1;
+                this.missCount++;
+                if (Settings.misspeno === 'on') this.score = Math.max(0, this.score - 5);
+                if (this.gameMode === 'endless') {
+                    this.ammo--;
+                    this.updateAmmoUI();
+                    if (this.ammo <= 0) this.endGame();
+                }
+                this.updateHUD();
+            }
+
+            updateHUD() {
+                document.getElementById('score-val').textContent = this.score;
+                document.getElementById('combo-display').textContent = this.combo > 1 ? `×${this.combo.toFixed(1)} COMBO` : '';
+                document.getElementById('streak-val').textContent = this.streak > 1 ? `🔥 ${this.streak}x STREAK` : '';
+            }
+
+            updateCrosshair() {
+                const el = document.getElementById('crosshair');
+                const x = (1 - HandTracker.aimX) * window.innerWidth;
+                const y = HandTracker.aimY * window.innerHeight;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+
+                // Scale on pinch
+                const scale = HandTracker.gestureState === 'PINCH' ? 1.3 : 1;
+                el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            }
+
+            applySettings() {
+                this.showTrajectory = Settings.trajectory === 'on';
+                // Recolor lights based on theme
+            }
+
+            startMode(mode) {
+                this.gameMode = mode;
+                this.score = 0;
+                this.streak = 0;
+                this.combo = 1;
+                this.totalShots = 0;
+                this.totalHits = 0;
+                this.missCount = 0;
+                this.ammo = this.maxAmmo;
+                this.gameOverShown = false;
+                this.diffScale = 1;
+                this.updateAmmoUI();
+                this.updateHUD();
+
+                // Clear targets & projectiles
+                this.targets.forEach(t => this.scene.remove(t.mesh));
+                this.targets = [];
+                this.projectiles.forEach(p => this.scene.remove(p.mesh));
+                this.projectiles = [];
+                this.particles.forEach(p => this.scene.remove(p.mesh));
+                this.particles = [];
+
+                // Spawn targets
+                const cnt = { practice: 4, time60: 5, endless: 4, challenge: 6 }[mode] || 4;
+                for (let i = 0; i < cnt; i++) this.spawnTarget();
+
+                // Timer
+                const timerEl = document.getElementById('timer-display');
+                if (mode === 'time60') {
+                    this.timeLeft = 60;
+                    timerEl.style.display = 'block';
+                    document.getElementById('timer-val').textContent = '60';
+                } else if (mode === 'time120') {
+                    this.timeLeft = 120;
+                    timerEl.style.display = 'block';
+                } else {
+                    timerEl.style.display = 'none';
+                }
+
+                const modeNames = { practice: 'PRACTICE', time60: 'TIME ATTACK', endless: 'ENDLESS', challenge: 'CHALLENGE' };
+                document.getElementById('mode-val').textContent = modeNames[mode] || mode.toUpperCase();
+
+                this.running = true;
+                this.paused = false;
+                hideOverlay();
+                this.updateHUD();
+            }
+
+            stop() {
+                this.running = false;
+            }
+
+            togglePause() {
+                if (!this.running) return;
+                if (this.paused) {
+                    this.resume();
+                } else {
+                    this.paused = true;
+                    showOverlay('PAUSED', null, `SCORE: ${this.score} • STREAK: ${this.maxStreak}`, 'RESUME');
+                }
+            }
+
+            resume() {
+                this.paused = false;
+                hideOverlay();
+            }
+
+            toggleTrajectory() {
+                this.showTrajectory = !this.showTrajectory;
+                Settings.trajectory = this.showTrajectory ? 'on' : 'off';
+                showNotif('TRAJECTORY: ' + (this.showTrajectory ? 'ON' : 'OFF'));
+            }
+
+            toggleWebcam() {
+                this.webcamVisible = !this.webcamVisible;
+                document.getElementById('webcam-wrap').style.opacity = this.webcamVisible ? '1' : '0.1';
+            }
+
+            endGame() {
+                if (this.gameOverShown) return;
+                this.gameOverShown = true;
+                this.running = false;
+                saveScore(this.score, this.gameMode);
+                const acc = this.totalShots > 0 ? Math.round(this.totalHits / this.totalShots * 100) : 0;
+                showOverlay('GAME OVER', this.score, `ACCURACY: ${acc}% • BEST STREAK: ${this.maxStreak}`, 'PLAY AGAIN');
+                document.getElementById('overlay-title').style.color = '#ff2d78';
+            }
+
+            loop(ts) {
+                requestAnimationFrame(this.loop);
+                const dt = this.clock.getDelta();
+
+                // FPS
+                this._fpsFrames++;
+                this._fpsTime += dt;
+                if (this._fpsTime > 0.5) {
+                    this.lastFps = Math.round(this._fpsFrames / this._fpsTime);
+                    document.getElementById('fps-counter').textContent = this.lastFps + ' FPS';
+                    this._fpsFrames = 0;
+                    this._fpsTime = 0;
+                }
+
+                HandTracker.update();
+                this.updateCrosshair();
+
+                if (!this.running || this.paused) {
+                    this.renderer.render(this.scene, this.camera);
+                    return;
+                }
+
+                const time = ts * 0.001;
+
+                // Difficulty scaling for challenge mode
+                if (this.gameMode === 'challenge') {
+                    this.diffScale = 1 + this.score * 0.002;
+                }
+
+                // SHOOT trigger
+                const shooting = HandTracker.isShooting && HandTracker.gestureState !== 'FIST';
+                if (shooting && !this.lastShootState) {
+                    this.shoot();
+                }
+                this.lastShootState = shooting;
+
+                // Timer
+                if (this.gameMode === 'time60') {
+                    this.timeLeft -= dt;
+                    if (this.timeLeft <= 0) {
+                        this.timeLeft = 0;
+                        document.getElementById('timer-val').textContent = '0';
+                        this.endGame();
+                    } else {
+                        document.getElementById('timer-val').textContent = Math.ceil(this.timeLeft);
+                        if (this.timeLeft < 10) {
+                            document.getElementById('timer-val').style.color = '#ff2d78';
+                        }
+                    }
+                }
+
+                // Target spawn
+                this.spawnTimer += dt;
+                const spawnInterval = 4 / Settings.spawnrate / this.diffScale;
+                if (this.spawnTimer > spawnInterval && this.targets.filter(t => t.alive).length < 8) {
+                    this.spawnTimer = 0;
+                    this.spawnTarget();
+                }
+
+                // Update targets
+                for (const t of this.targets) {
+                    if (!t.alive) continue;
+                    t.age += dt;
+                    t.phase += t.speed;
+                    t.phaseY += t.speed * 0.7;
+
+                    if (t.moveType === 'horizontal') {
+                        t.mesh.position.x = t.baseX + Math.sin(t.phase) * 5;
+                    } else if (t.moveType === 'circular') {
+                        t.mesh.position.x = t.baseX + Math.sin(t.phase) * 3;
+                        t.mesh.position.y = t.baseY + Math.cos(t.phaseY) * 2;
+                    } else if (t.moveType === 'random') {
+                        t.mesh.position.x = t.baseX + Math.sin(t.phase * 1.3) * 3 + Math.cos(t.phaseY * 0.8) * 2;
+                        t.mesh.position.y = t.baseY + Math.sin(t.phaseY) * 2;
+                    }
+
+                    // Rotate ring
+                    t.mesh.children[0].rotation.y += 0.01;
+                    t.mesh.children[1].rotation.z += 0.015;
+
+                    // Expire old targets in non-practice modes
+                    if (t.age > t.maxAge && this.gameMode !== 'practice') {
+                        t.alive = false;
+                        this.scene.remove(t.mesh);
+                        this.targets = this.targets.filter(x => x !== t);
+                        this.miss();
+                        this.spawnTarget();
+                    }
+                }
+
+                // Update projectiles
+                const g = Settings.gravity * 0.001;
+                for (const p of this.projectiles) {
+                    if (!p.alive) continue;
+                    p.vy -= g;
+                    p.mesh.position.x += p.vx;
+                    p.mesh.position.y += p.vy;
+                    p.mesh.position.z += p.vz;
+                    p.age++;
+
+                    // Orient arrow to velocity
+                    const angle = Math.atan2(p.vy, -p.vz);
+                    p.mesh.rotation.x = angle;
+
+                    // Hit check
+                    this.checkHits(p);
+
+                    // Out of range
+                    if (p.mesh.position.z < -40 || p.mesh.position.y < -5 || p.age > 200) {
+                        this.scene.remove(p.mesh);
+                        if (p.alive) this.miss();
+                        p.alive = false;
+                    }
+                }
+                this.projectiles = this.projectiles.filter(p => p.alive);
+
+                // Update particles
+                for (const p of this.particles) {
+                    p.mesh.position.x += p.vx;
+                    p.mesh.position.y += p.vy;
+                    p.mesh.position.z += p.vz;
+                    p.vy -= 0.005;
+                    p.life -= p.decay;
+                    p.mesh.material.opacity = p.life;
+                    p.mesh.material.transparent = true;
+                    if (p.life <= 0) {
+                        this.scene.remove(p.mesh);
+                        p.life = 0;
+                    }
+                }
+                this.particles = this.particles.filter(p => p.life > 0);
+
+                // Trajectory
+                this.updateTrajectory();
+
+                // Camera shake
+                if (this._shakeIntensity > 0.001) {
+                    this.camera.position.x = Math.sin(time * 40) * this._shakeIntensity;
+                    this.camera.position.y = 2 + Math.cos(time * 35) * this._shakeIntensity;
+                    this._shakeIntensity *= 0.85;
+                } else {
+                    this.camera.position.x = 0;
+                    this.camera.position.y = 2;
+                    this._shakeIntensity = 0;
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        HandTracker.init();
+
+        // Start THREE engine early (shows background scene)
+        window.Game = null;
+        const previewScene = (() => {
+            const canvas = document.getElementById('three-canvas');
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x060a12);
+            scene.fog = new THREE.FogExp2(0x060a12, 0.015);
+
+            const cam = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+            cam.position.set(0, 2, 12);
+
+            const ambient = new THREE.AmbientLight(0x0a1a2a, 2);
+            scene.add(ambient);
+
+            const dir = new THREE.DirectionalLight(0x00ffe7, 1);
+            dir.position.set(5, 10, 5);
+            scene.add(dir);
+
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(80, 80),
+                new THREE.MeshStandardMaterial({ color: 0x050a14 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -3;
+            scene.add(floor);
+
+            const grid = new THREE.GridHelper(60, 30, 0x001a2a, 0x001a2a);
+            grid.position.y = -2.99;
+            scene.add(grid);
+
+            // Floating rings for preview
+            const rings = [];
+            for (let i = 0; i < 8; i++) {
+                const r = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.6 + Math.random() * 0.4, 0.08, 8, 32),
+                    new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xff2d78 : 0x00ffe7, emissive: i % 2 === 0 ? 0xff2d78 : 0x00ffe7, emissiveIntensity: 0.5 })
+                );
+                r.position.set((Math.random() - 0.5) * 16, 1 + Math.random() * 6, -8 - Math.random() * 12);
+                scene.add(r);
+                rings.push({ mesh: r, phase: Math.random() * Math.PI * 2, baseY: r.position.y });
+            }
+
+            window.addEventListener('resize', () => {
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                cam.aspect = window.innerWidth / window.innerHeight;
+                cam.updateProjectionMatrix();
+            });
+
+            let active = true;
+            const tick = t => {
+                if (!active) return;
+                requestAnimationFrame(tick);
+                const time = t * 0.001;
+                rings.forEach((r, i) => {
+                    r.mesh.rotation.x += 0.01;
+                    r.mesh.rotation.y += 0.008;
+                    r.mesh.position.y = r.baseY + Math.sin(time + r.phase) * 0.8;
+                });
+                renderer.render(scene, cam);
+            };
+            requestAnimationFrame(tick);
+            return { stop: () => { active = false; } };
+        })();
+
+        function initGameForReal() {
+            if (previewScene) previewScene.stop();
+            if (!window.Game) window.Game = new GameEngine();
+        }
+
+        // Override startGame to init engine if needed
+        const _origStart = window.startGame;
+        window.startGame = function () {
+            initGameForReal();
+            setTimeout(() => {
+                document.getElementById('main-menu').style.display = 'none';
+                if (HandTracker.cameraReady) {
+                    showCalibration();
+                    Game.calibrating = true;
+                    // Auto-end calibration after time if no hand
+                    setTimeout(() => {
+                        if (document.getElementById('calibration-screen').classList.contains('show')) {
+                            skipCalibration();
+                        }
+                    }, 8000);
+                } else {
+                    initGameMode();
+                }
+            }, 100);
+        };
+
+        // Override initGameMode
+        window.initGameMode = function () {
+            document.getElementById('calibration-screen').classList.remove('show');
+            if (window.Game) {
+                Game.calibrating = false;
+                Game.startMode(selectedMode);
+            }
+        };
+    </script>
+</body>
+
+</html>
